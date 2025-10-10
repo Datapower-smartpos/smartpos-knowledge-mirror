@@ -1,0 +1,109 @@
+Advanced Undocumented Hardening Techniques for Windows 10 IoT LTSC 2021
+=======================================================================
+
+Цель:
+-----
+Расширить базовые методы защиты и диагностики POS-терминала за счёт undocumented или малодокументированных возможностей Windows.
+
+----------------------------------------------------------
+1. Unified Write Filter (UWF) — фильтр защиты от записи
+----------------------------------------------------------
+
+1.1 Включение:
+
+    Enable-WindowsOptionalFeature -Online -FeatureName UWF
+    uwfmgr.exe filter enable
+    uwfmgr.exe volume protect C:
+
+1.2 Опции:
+
+    uwfmgr.exe overlay set-size 1024      (1 ГБ оверлей)
+    uwfmgr.exe overlay get-config
+
+1.3 Преимущества:
+- POS сохраняет "чистое" состояние после перезагрузки
+- Предотвращает повреждение конфигурации от сбоев
+- Увеличивает срок службы SSD
+
+-----------------------------------------------------------------
+2. Verbose BSOD и расширенные дампы
+-----------------------------------------------------------------
+
+2.1 Редактировать реестр или использовать .reg-файл:
+
+    [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl]
+    "DisplayParameters"=dword:00000001
+    "CrashDumpEnabled"=dword:00000002
+
+2.2 Это позволяет:
+- Показать драйвер, вызвавший сбой
+- Собрать полный дамп ядра
+
+-----------------------------------------------------------------
+3. Отключение Core Parking, ускорение отклика системы
+-----------------------------------------------------------------
+
+    [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile]
+    "NetworkThrottlingIndex"=dword:ffffffff
+    "SystemResponsiveness"=dword:00000001
+
+    [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Power\PowerSettings\*]
+    Установите параметр Core Parking → 100% активных ядер
+
+Это устранит случайные лаги на слабом CPU при фоновой нагрузке.
+
+-----------------------------------------------------------------
+4. Включение ETW: Kernel-Power и WHEA Logger
+-----------------------------------------------------------------
+
+    wevtutil sl "Microsoft-Windows-Kernel-Power" /e:true
+    wevtutil sl "Microsoft-Windows-Kernel-WHEA" /e:true
+
+События:
+
+- EventID 41 = неожиданный ребут
+- EventID 18 = ошибка CPU/памяти/питания (WHEA)
+
+-----------------------------------------------------------------
+5. Верификация DEP, ASLR (ProcessMitigations)
+-----------------------------------------------------------------
+
+    Get-ProcessMitigation -System
+
+Убедитесь:
+- DEP = AlwaysOn
+- ASLR = Enabled for DLLs
+
+Если отключено → уязвимо к сбоям при нестандартных EXE
+
+-----------------------------------------------------------------
+6. Контроль ошибок драйверов (EventID 219, USB)
+-----------------------------------------------------------------
+
+    Get-WinEvent -FilterXPath '*[System/EventID=219]' -LogName System
+
+Это позволяет выявить:
+
+- Сломанные USB-драйверы
+- Нестабильные кассовые устройства
+
+-----------------------------------------------------------------
+7. Использование Reliability Monitor и Watchdog служб
+-----------------------------------------------------------------
+
+    perfmon /rel → UI
+    Get-WinEvent -ProviderName "Microsoft-Windows-Reliability-Analysis-Engine"
+
+Контроль служб:
+
+    Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'; Id=7036}
+
+Может быть встроено в watchdog-агент для автоматической перезагрузки службы при сбое.
+
+-----------------------------------------------------------------
+Рекомендации:
+-----------------------------------------------------------------
+
+✔ Включать UWF только после отладки
+✔ Все ключи можно внести в provisioning.xml или setup.ps1
+✔ Эти методы повышают стабильность, особенно при сбоях диска, питания, деструктивного ПО

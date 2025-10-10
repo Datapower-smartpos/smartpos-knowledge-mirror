@@ -1,0 +1,4 @@
+﻿[
+  {"vid": "1234", "pid": "0001", "service": "SmartPOS_USB_Service"},
+  {"vid": "ABCD", "pid": "EF12", "service": "SmartPOS_USB_Service"}
+]

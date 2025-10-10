@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SmartPOS USB Agent — MSI (WiX v3) | v1.4.1
+     Назначение: установка Python-сервиса и утилит без трея.
+     Улучшения:
+     - Канонические пути (src\python, installer\scripts, tools), без трея
+     - UI с вводом API Key: InstallDir + ApiKeyDlg
+     - Запись %ProgramData%\SmartPOS\usb_agent\config.json
+	 - CA: install/uninstall service + watchdog
+     - PostInstall: регистрация службы и watchdog через PowerShell
+     - Uninstall: корректное снятие watchdog и удаление службы
+     - Без включения .NET Tray (вынесен в отдельный MSI)
+	 - Исправлено: KeyPath для multi-file components, CreateFolder KeyPath
+     - Добавлен MajorUpgrade, ярлык на CLI
+     - Требуется линковка с WixUtilExtension (WixQuietExec)
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Product Id="*" Name="SmartPOS USB Agent" Language="1049" Version="1.4.1" Manufacturer="SmartPOS" UpgradeCode="65A6B33F-6E45-46F1-8D11-56B9B3D2C5C1">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"/>
+    <MediaTemplate EmbedCab="yes"/>
+    <MajorUpgrade AllowDowngrades="no" DowngradeErrorMessage="Более новая версия уже установлена." />
+
+    <Property Id="APIKEY" Secure="yes"/>
+    <!-- Важно: привязать UI-диалог InstallDir к нашей корневой папке -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER"/>
+    
+    <!-- ARP (Add/Remove Programs) свойства для красивого отображения -->
+    <Property Id="ARPCONTACT" Value="info@brainpos.net"/>
+    <Property Id="ARPURLINFOABOUT" Value="https://brainpos.net/"/>
+    <!-- (опционально) другие ссылки, если нужны -->
+    <Property Id="ARPHELPLINK" Value="https://brainpos.net/support"/>
+    <Property Id="ARPURLUPDATEINFO" Value="https://brainpos.net/downloads"/>
+    <!-- <Property Id="ARPPRODUCTICON" Value="app.ico"/> -->
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="SmartPOS_USB_Agent">
+          <Directory Id="SRC" Name="src">
+            <Directory Id="PY" Name="python" />
+          </Directory>
+          <Directory Id="INSTALLER_SCRIPTS" Name="installer">
+            <Directory Id="INSTALLER_SCRIPTS_SUB" Name="scripts" />
+          </Directory>
+          <Directory Id="TOOLS" Name="tools" />
+        </Directory>
+      </Directory>
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="SMARTPOSDATA" Name="SmartPOS">
+          <Directory Id="USBDATA" Name="usb_agent" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuDir" Name="SmartPOS USB Agent"/>
+      </Directory>
+    </Directory>
+
+    <!-- Files -->
+    <DirectoryRef Id="PY">
+      <Component Id="cmpPythonService" Guid="*" Win64="yes">
+        <File Id="fService" Source="..\..\src\python\smartpos_usb_service_v14.py" KeyPath="yes"/>
+      </Component>
+      <Component Id="cmpPythonCore" Guid="*" Win64="yes">
+        <File Id="fCore" Source="..\..\src\python\usb_agent_core.py" KeyPath="yes"/>
+      </Component>
+      <Component Id="cmpTraceWrappers" Guid="*" Win64="yes">
+        <File Id="fTrace" Source="..\..\src\python\trace_wrappers_v2.py" KeyPath="yes"/>
+      </Component>
+      <Component Id="cmpCLI" Guid="*" Win64="yes">
+        <File Id="fCLI" Source="..\..\src\python\usb_devctl_cli.py" KeyPath="yes"/>
+      </Component>
+	  <Component Id="cmpRunBat" Guid="*" Win64="yes">
+        <File Id="fRunBat" Source="..\..\src\python\run_usb_devctl.bat" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="INSTALLER_SCRIPTS_SUB">
+      <Component Id="cmpScripts" Guid="*" Win64="yes">
+        <File Id="fInstallSvc" Source="..\..\installer\scripts\install_service.ps1" KeyPath="yes"/>
+        <File Id="fUninstallSvc" Source="..\..\installer\scripts\uninstall_service.ps1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="TOOLS">
+      <Component Id="cmpTools" Guid="*" Win64="yes">
+        <File Id="fInstallWd" Source="..\..\tools\install_watchdog.ps1" KeyPath="yes"/>
+        <File Id="fUninstallWd" Source="..\..\tools\uninstall_watchdog.ps1"/>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="USBDATA">
+      <Component Id="cmpConfigFolder" Guid="*" Win64="yes">
+        <CreateFolder/>
+        <RegistryValue Root="HKLM" Key="Software\SmartPOS\USB_Agent" Name="DataFolder" Value="[USBDATA]" Type="string" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <!-- Shortcuts -->
+    <DirectoryRef Id="ProgramMenuDir">
+      <Component Id="cmpShortcuts" Guid="*" Win64="yes">
+        <Shortcut Id="scCLI" Name="SmartPOS USB Agent — CLI" Target="[INSTALLFOLDER]src\python\run_usb_devctl.bat" WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveMenuDir" On="uninstall"/>
+        <RegistryValue Root="HKCU" Key="Software\SmartPOS\USB_Agent" Name="HasShortcuts" Type="integer" Value="1" KeyPath="yes"/>
+      </Component>
+    </DirectoryRef>
+
+    <!-- UI -->
+    <UIRef Id="WixUI_InstallDir"/>
+    <UI>
+      <DialogRef Id="BrowseDlg"/>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ApiKeyDlg">1</Publish>
+
+      <Dialog Id="ApiKeyDlg" Width="370" Height="270" Title="SmartPOS USB Agent">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="15" Text="Введите API Key (можно пусто)"/>
+        <Control Id="ApiKeyEdit" Type="Edit" X="15" Y="40" Width="340" Height="18" Property="APIKEY"/>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="<&Back" Default="no">
+          <Publish Event="NewDialog" Value="InstallDirDlg">1</Publish>
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Text="Next >" Default="yes">
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="292" Y="243" Width="56" Height="17" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+    </UI>
+
+    <!-- Custom Actions -->
+    <CustomAction Id="WriteConfigJson" Property="WixQuietExecCmdLine" Value='powershell -ExecutionPolicy Bypass -NoLogo -NonInteractive -Command "\
+      $p=Join-Path $env:ProgramData \"SmartPOS\\usb_agent\\config.json\"; \
+      New-Item -ItemType Directory -Force -Path (Split-Path $p) | Out-Null; \
+      $obj=@{ api_key=\"[APIKEY]\"; created_utc=(Get-Date).ToUniversalTime().ToString(\"s\")+\"Z\" }; \
+      ($obj | ConvertTo-Json -Compress) | Out-File -FilePath $p -Encoding UTF8 -Force; \
+    "'/>
+    <CustomActionRef Id="WixQuietExec"/>
+
+    <CustomAction Id="InstallServiceCA" Property="WixQuietExecCmdLine" Value='powershell -ExecutionPolicy Bypass -NoLogo -NonInteractive -File "[INSTALLFOLDER]installer\scripts\install_service.ps1"'/>
+    <CustomAction Id="InstallWatchdogCA" Property="WixQuietExecCmdLine" Value='powershell -ExecutionPolicy Bypass -NoLogo -NonInteractive -File "[INSTALLFOLDER]tools\install_watchdog.ps1"'/>
+    <CustomAction Id="UninstallWatchdogCA" Property="WixQuietExecCmdLine" Value='powershell -ExecutionPolicy Bypass -NoLogo -NonInteractive -File "[INSTALLFOLDER]tools\uninstall_watchdog.ps1"'/>
+    <CustomAction Id="UninstallServiceCA" Property="WixQuietExecCmdLine" Value='powershell -ExecutionPolicy Bypass -NoLogo -NonInteractive -File "[INSTALLFOLDER]installer\scripts\uninstall_service.ps1"'/>
+
+    <InstallExecuteSequence>
+      <!-- 1) Записать config.json -->
+      <Custom Action="WriteConfigJson" After="InstallFiles">NOT Installed OR REINSTALL</Custom>
+      <Custom Action="WixQuietExec"  After="WriteConfigJson">NOT Installed OR REINSTALL</Custom>
+
+      <!-- 2) Установить службу -->
+      <Custom Action="InstallServiceCA" After="WixQuietExec">NOT Installed OR REINSTALL</Custom>
+      <Custom Action="WixQuietExec"    After="InstallServiceCA">NOT Installed OR REINSTALL</Custom>
+
+      <!-- 3) Установить watchdog -->
+      <Custom Action="InstallWatchdogCA" After="WixQuietExec">NOT Installed OR REINSTALL</Custom>
+      <Custom Action="WixQuietExec"      After="InstallWatchdogCA">NOT Installed OR REINSTALL</Custom>
+
+      <!-- Uninstall: штатный порядок -->
+      <Custom Action="UninstallWatchdogCA" Before="RemoveFiles">REMOVE="ALL"</Custom>
+      <Custom Action="WixQuietExec"        After="UninstallWatchdogCA">REMOVE="ALL"</Custom>
+      <Custom Action="UninstallServiceCA"  After="WixQuietExec">REMOVE="ALL"</Custom>
+      <Custom Action="WixQuietExec"        After="UninstallServiceCA">REMOVE="ALL"</Custom>
+    </InstallExecuteSequence>
+
+    <Feature Id="Complete" Title="SmartPOS USB Agent" Level="1">
+      <ComponentRef Id="cmpPythonService"/>
+      <ComponentRef Id="cmpPythonCore"/>
+      <ComponentRef Id="cmpTraceWrappers"/>
+      <ComponentRef Id="cmpCLI"/>
+	  <ComponentRef Id="cmpRunBat"/>
+      <ComponentRef Id="cmpScripts"/>
+      <ComponentRef Id="cmpTools"/>
+      <ComponentRef Id="cmpConfigFolder"/>
+      <ComponentRef Id="cmpShortcuts"/>
+    </Feature>
+  </Product>
+</Wix>

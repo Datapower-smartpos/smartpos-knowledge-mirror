@@ -1,0 +1,120 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "oneOf": [
+        {
+            "properties": {
+                "collector": {
+                    "type": "object",
+                    "properties": {
+                        "eventlog": {
+                            "type": "object",
+                            "properties": {
+                                "wer": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "required": [
+                        "eventlog"
+                    ]
+                },
+                "safety_guards": {
+                    "type": "object",
+                    "properties": {
+                        "working_hours": {
+                            "type": "object",
+                            "properties": {
+                                "start": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 23
+                                },
+                                "end": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 24
+                                }
+                            },
+                            "required": [
+                                "start",
+                                "end"
+                            ]
+                        },
+                        "dangerous_actions_block": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "max_actions_per_hour": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 50
+                        },
+                        "confirm_required": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "working_hours",
+                        "dangerous_actions_block",
+                        "max_actions_per_hour",
+                        "confirm_required"
+                    ]
+                },
+                "hardening": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "collector",
+                "safety_guards"
+            ]
+        },
+        {
+            "properties": {
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "match": {
+                                "type": "object"
+                            },
+                            "issue_code": {
+                                "type": "string"
+                            },
+                            "severity": {
+                                "type": "string"
+                            },
+                            "dedup_key": {
+                                "type": "string"
+                            },
+                            "repeat_thresholds": {
+                                "type": "array"
+                            },
+                            "plan": {
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "match",
+                            "issue_code",
+                            "severity",
+                            "plan"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "rules"
+            ]
+        }
+    ]
+}

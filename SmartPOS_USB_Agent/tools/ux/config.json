@@ -1,0 +1,50 @@
+﻿{
+    "trace_filters":  {
+                          "include_ports":  [
+
+                                            ],
+                          "exclude_ports":  [
+
+                                            ],
+                          "include_vidpid":  [
+                                                 "046D:C542",
+                                                 "0A5C:5843",
+                                                 "0C45:6D22",
+                                                 "8086:A73E",
+                                                 "8087:0033",
+                                                 "8087:0AC2"
+                                             ],
+                          "exclude_vidpid":  [
+
+                                             ]
+                      },
+    "retention":  {
+                      "sqlite_max_days":  14,
+                      "logs_max_size_mb":  64
+                  },
+    "logging":  {
+                    "backup_count":  5,
+                    "max_bytes":  1048576,
+                    "level":  "INFO"
+                },
+    "paths":  {
+                  "data_dir":  "C:\\ProgramData\\SmartPOS\\usb_agent",
+                  "logs_dir":  "C:\\ProgramData\\SmartPOS\\usb_agent\\logs",
+                  "db_path":  "C:\\ProgramData\\SmartPOS\\usb_agent\\db\\events.sqlite"
+              },
+    "export":  {
+                   "allow_masks":  [
+                                       "logs/*.log",
+                                       "db/*.sqlite"
+                                   ]
+               },
+    "watchdog":  {
+                     "service_name":  "SmartPOS_USB_Agent",
+                     "enabled":  true
+                 },
+    "api_key":  "SPU1-ACME-2CV7A-VTHVM-N7LTE-PA2MO-WNXQG-MT22T-652OZ-425SM-RAZ32-SX2DG-6A",
+    "http":  {
+                 "host":  "127.0.0.1",
+                 "port":  19955
+             }
+}

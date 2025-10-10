@@ -1,0 +1,225 @@
+{
+  "version": "1.0",
+  "windows_profile": "LTSC2021",
+  "collector": {
+    "enable_diagnostic_profile": true,
+    "eventlog": {
+      "lookback_days": 1,
+      "channels": [
+        {
+          "log": "System",
+          "providers": [
+            "Service Control Manager",
+            "Microsoft-Windows-PrintService",
+            "Microsoft-Windows-Disk",
+            "Microsoft-Windows-Ntfs",
+            "Microsoft-Windows-Kernel-Power"
+          ],
+          "days_lookback": 1
+        },
+        {
+          "log": "Application",
+          "providers": [
+            ".NET Runtime",
+            "Application Error"
+          ],
+          "days_lookback": 1
+        }
+      ],
+      "max_events_per_tick": 200,
+      "wer": {
+        "enabled": true,
+        "lookback_days": 7,
+        "max_reports_per_tick": 50,
+        "include_report_queue": false,
+        "critical_processes": [
+          "smartpos_agent.exe",
+          "pos_frontend.exe",
+          "pos_printer_service.exe"
+        ],
+        "ignore_processes": [
+          "AmneziaVPN.exe",
+          "AmneziaVPN-service.exe",
+          "Dell.DigitalDelivery.exe",
+          "Dell.TechHub.*"
+        ],
+        "dedup_key": [
+          "proc",
+          "faulting_module",
+          "exception_code"
+        ]
+      }
+    },
+    "reliability": {
+      "enabled": true,
+      "days_lookback": 7
+    },
+    "services": {
+      "watch": [
+        "Spooler"
+      ],
+      "restart_threshold_per_hour": 3
+    },
+    "verbose": true
+  },
+  "classifier": {
+    "critical_processes": [
+      "smartpos_agent.exe",
+      "pos_frontend.exe",
+      "pos_printer_service.exe",
+      "SmartPOS",
+      "POS",
+      "CashRegister",
+      "Terminal",
+      "PrintService",
+      "Spooler"
+    ],
+    "ignore_processes": [
+      "AmneziaVPN.exe",
+      "AmneziaVPN-service.exe",
+      "Dell.DigitalDelivery.exe",
+      "Dell.TechHub.*",
+      "MicrosoftEdge",
+      "Edge",
+      "Chrome",
+      "Firefox",
+      "Notepad",
+      "Calculator",
+      "Paint",
+      "Windows Update",
+      "WinGet",
+      "CBS",
+      "TrustedInstaller",
+      "wuauclt",
+      "wuaueng",
+      "wuauserv",
+      "wuuhosdeployment"
+    ],
+    "max_duplicates_per_tick": 3,
+    "access_violation_codes": [
+      "c0000005"
+    ],
+    "sev_rules": [
+      {
+        "when_proc_in": "critical_processes",
+        "severity": "CRIT"
+      },
+      {
+        "when_proc_in": "ignore_processes",
+        "severity": "IGNORE"
+      },
+      {
+        "default": true,
+        "severity": "WARN"
+      }
+    ],
+    "exception_mapping": {
+      "c0000005": "AccessViolation",
+      "c0000006": "InPageError",
+      "c000001d": "IllegalInstruction",
+      "c0000025": "NoncontinuableException",
+      "c0000026": "InvalidDisposition",
+      "c000008f": "ArrayBoundsExceeded",
+      "c0000094": "IntegerDivideByZero",
+      "c0000096": "PrivilegedInstruction",
+      "c00000fd": "StackOverflow"
+    }
+  },
+  "rules": [
+    {
+      "match": {
+        "source": "EventLog.System",
+        "provider": "Disk",
+        "event_id": [
+          51,
+          153
+        ]
+      },
+      "issue_code": "DISK_IO_WARN",
+      "severity": "WARN",
+      "hint": "Проверьте кабель/порт; скоррелировать со SMART; при повторах — плановый chkdsk.",
+      "plan": [
+        {
+          "do": "link_smart",
+          "timeout_ms": 2000
+        },
+        {
+          "do": "schedule",
+          "task": "plan_chkdsk",
+          "window": "02:00-05:00",
+          "if_repeated_within_min": 60
+        }
+      ],
+      "rate_limit_per_hour": 3
+    },
+    {
+      "match": {
+        "source": "EventLog.System",
+        "provider": "Service Control Manager",
+        "event_id": [
+          7031,
+          7034
+        ],
+        "service": "Spooler"
+      },
+      "issue_code": "PRINT_SPOOLER_STUCK",
+      "severity": "WARN",
+      "plan": [
+        {
+          "do": "restart_service",
+          "name": "Spooler",
+          "timeout_ms": 15000
+        },
+        {
+          "do": "clear_print_queue",
+          "if_idle_minutes": 10
+        }
+      ],
+      "rate_limit_per_hour": 6
+    },
+    {
+      "match": {
+        "source": "WER",
+        "crash": true,
+        "proc_mask": [
+          "*POS*"
+        ]
+      },
+      "issue_code": "POS_APP_CRASH",
+      "severity": "WARN",
+      "plan": [
+        {
+          "do": "collect_wer_bundle"
+        },
+        {
+          "do": "mark_for_review"
+        }
+      ]
+    }
+  ],
+  "safety_guards": {
+    "working_hours": {
+      "start": 8,
+      "end": 22
+    },
+    "dangerous_actions_block": [
+      "plan_chkdsk",
+      "restart_pos_app",
+      "reset_wu_components"
+    ],
+    "max_actions_per_hour": 5,
+    "confirm_required": false
+  },
+  "hardening": {
+    "allow_undocumented": false,
+    "power": {
+      "usb_selective_suspend": "Disable"
+    },
+    "defender": {
+      "add_exclusions": [
+        "C:\\\\SmartPOS\\\\logs",
+        "C:\\\\SmartPOS\\\\agent"
+      ]
+    }
+  }
+}

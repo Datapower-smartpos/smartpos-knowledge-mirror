@@ -1,0 +1,6 @@
+from remediate.actions import restart_service
+
+def test_restart_service_smoke():
+    # This is a smoke test; on CI it should not fail hard. на CI не упадёт: команду игнорируем по ошибкам
+    restart_service("Spooler", timeout_ms=2000)
+

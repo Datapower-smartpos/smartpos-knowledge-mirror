@@ -1,0 +1,6 @@
+from analyzer.classify import classify_events
+
+def test_spooler_issue():
+    ev = {"source":"EventLog.System","provider":"Service Control Manager","event_id":7031}
+    issues = classify_events([ev])
+    assert any(i["issue_code"]=="PRINT_SPOOLER_STUCK" for i in issues)

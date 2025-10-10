@@ -1,0 +1,73 @@
+Настройка Event Log (журналов событий) для диагностики на Windows 10 IoT Enterprise LTSC 2021
+============================================================================================
+
+Цель:
+-----
+Повысить информативность журналов Windows, включая Application, System, .NET Runtime, Diagnostics, 
+для надёжного выявления и анализа ошибок POS-агента и других компонентов.
+
+Шаг 1. Включение всех ключевых журналов
+---------------------------------------
+
+Откройте PowerShell от имени администратора и выполните:
+
+    wevtutil sl Application /e:true
+    wevtutil sl System /e:true
+    wevtutil sl Security /e:true
+    wevtutil sl Setup /e:true
+    wevtutil sl "Microsoft-Windows-Diagnostics-Performance/Operational" /e:true
+    wevtutil sl "Microsoft-Windows-WMI-Activity/Operational" /e:true
+    wevtutil sl "Microsoft-Windows-TaskScheduler/Operational" /e:true
+
+Шаг 2. Увеличение лимита хранимых событий
+-----------------------------------------
+
+По умолчанию журнал Application ограничен 20 МБ. Увеличим до 100 МБ и отключим автоудаление:
+
+    wevtutil sl Application /ms:104857600
+    wevtutil sl Application /rt:true
+
+При необходимости — повторить для других журналов (System, Security и т.п.)
+
+Шаг 3. Включение логирования .NET и WMI-ошибок
+----------------------------------------------
+
+    reg add "HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting\DebugApplications" /v DebugWmi /t REG_DWORD /d 1 /f
+    reg add "HKLM\SOFTWARE\Microsoft\.NETFramework" /v EnableLog /t REG_DWORD /d 1 /f
+
+Шаг 4. Включение диагностической телеметрии
+-------------------------------------------
+
+    reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 3 /f
+
+(Значение 3 = Enhanced. Это требуется для включения журналов Diagnostics-Performance)
+
+Шаг 5. Включение аудита создания процессов (опционально)
+---------------------------------------------------------
+
+Позволяет отследить запуск всех .exe и служб:
+
+    Auditpol /set /subcategory:"Process Creation" /success:enable /failure:enable
+
+Шаг 6. Перезапуск служб журналирования
+---------------------------------------
+
+    Restart-Service EventLog
+    Restart-Service Wecsvc
+
+Проверка: откройте "Просмотр событий" (eventvwr.msc) → вы должны видеть активные:
+
+- Application
+- System
+- .NET Runtime
+- WMI-Activity
+- Diagnostics-Performance
+
+События типа "Application Error", "AppHang", ".NET Runtime", "Service Control Manager" будут содержать:
+
+- Имя упавшего EXE
+- Код исключения (Exception Code)
+- Ошибку модуля (kernelbase.dll и др.)
+- StackTrace (для .NET)
+
+Эти данные можно будет анализировать автоматически через smart_pos_agent.

@@ -1,0 +1,73 @@
+Настройка системы для получения детализированных .WER-отчётов на Windows 10 IoT Enterprise LTSC 2021
+=========================================================================================
+
+Цель:
+-----
+Гарантировать, что система создаёт полные диагностические файлы об ошибках (.wer),
+включающие информацию об упавшем EXE, модуле, исключении (Exception Code),
+и позволяющие точно анализировать сбои POS-агента или других приложений.
+
+Шаг 1. Включение службы Windows Error Reporting (WER)
+------------------------------------------------------
+
+1.1 Через PowerShell (запустить от имени администратора):
+
+    Enable-WindowsErrorReporting
+    Set-Service WerSvc -StartupType Automatic
+    Start-Service WerSvc
+
+1.2 Проверка статуса:
+
+    Get-WindowsErrorReporting
+
+Шаг 2. Изменения в реестре (regedit или скрипт .reg)
+-----------------------------------------------------
+
+2.1 Создать следующие ключи и значения:
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting]
+"Disabled"=dword:00000000
+"DontSendAdditionalData"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Windows Error Reporting\Consent]
+"DefaultConsent"=dword:00000004
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\DataCollection]
+"AllowTelemetry"=dword:00000003
+"LimitDiagnosticLogCollection"=dword:00000001
+"LimitDumpCollection"=dword:00000001
+
+(Можно сохранить в .reg файл и выполнить двойным щелчком или через PowerShell)
+
+Шаг 3. Создание каталога дампов (опционально)
+----------------------------------------------
+
+    mkdir C:\Dumps
+
+    reg add "HKLM\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpFolder /t REG_SZ /d "C:\Dumps" /f
+    reg add "HKLM\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps" /v DumpType /t REG_DWORD /d 2 /f
+
+Шаг 4. Перезапуск службы и проверка
+------------------------------------
+
+    Restart-Service WerSvc
+
+    Проверить: после падения приложения в C:\ProgramData\Microsoft\Windows\WER\ReportQueue
+    должен появиться подкаталог с .wer-файлом (например, Report.wer или AppCrash_*.wer)
+
+Шаг 5. Какие файлы отправить на анализ
+---------------------------------------
+
+Скопировать и передать GPT следующие файлы:
+
+- C:\ProgramData\Microsoft\Windows\WER\ReportQueue\...\Report.wer
+- C:\ProgramData\Microsoft\Windows\WER\ReportArchive\...\Report.wer (если есть)
+- (опционально) C:\Users\%USERNAME%\AppData\Local\CrashDumps\*.dmp — если включён дамп
+
+Файлы можно открыть в Блокноте и проверить наличие:
+
+- Application Name
+- Fault Module Name
+- Exception Code
+
+Если эти поля присутствуют — сбой можно точно классифицировать.

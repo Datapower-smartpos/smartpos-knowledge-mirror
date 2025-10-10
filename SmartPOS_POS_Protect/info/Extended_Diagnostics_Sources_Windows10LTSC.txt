@@ -1,0 +1,135 @@
+Дополнительные источники диагностики Windows 10 IoT Enterprise LTSC 2021
+========================================================================
+
+Цель:
+-----
+Максимально расширить спектр журналов, логов и дампов, доступных для анализа проблем,
+сбоев и производительности POS-агента и сопутствующих компонентов.
+
+------------------------------------------------------
+1. Reliability Monitor (Монитор стабильности Windows)
+------------------------------------------------------
+
+1.1 Включение (обычно активен по умолчанию):
+
+    Служба: RacTask → должна быть включена в планировщике
+
+1.2 Просмотр в GUI:
+
+    Win + R → perfmon /rel
+
+1.3 Получение из PowerShell:
+
+    Get-WinEvent -ProviderName "Microsoft-Windows-Reliability-Analysis-Engine" | Format-Table
+
+1.4 Логи:
+
+    C:\ProgramData\Microsoft\Windows\ReliabilityMonitor\*
+
+    Формат: XML, сохраняется с задержкой 1-2 дня.
+
+------------------------------------------------------
+2. CBS.log и DISM.log — системные логи восстановления
+------------------------------------------------------
+
+2.1 Пути:
+
+    C:\Windows\Logs\CBS\CBS.log
+    C:\Windows\Logs\DISM\dism.log
+
+2.2 Команды:
+
+    sfc /scannow
+    dism /online /cleanup-image /scanhealth
+
+2.3 Фильтрация по ошибкам:
+
+    findstr /c:"[SR]" C:\Windows\Logs\CBS\CBS.log
+
+------------------------------------------------------
+3. ETL-трейсы (BootPerf, Autologger, DiagTrack)
+------------------------------------------------------
+
+3.1 Пути:
+
+    C:\PerfLogs\Admin\BootPerf\*.etl
+    C:\ProgramData\Microsoft\Diagnosis\ETLLogs\*
+
+3.2 Как включить автологгер:
+
+    В PowerShell:
+
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\BootPerf" /v Start /t REG_DWORD /d 1 /f
+
+3.3 Анализ:
+
+    tracerpt *.etl -o summary.csv
+    xperf *.etl (если установлен Windows Performance Toolkit)
+
+------------------------------------------------------
+4. Windows Update / WUA Logs
+------------------------------------------------------
+
+4.1 Получить merged WU log:
+
+    Get-WindowsUpdateLog -LogPath "C:\WU_merged.log"
+
+4.2 Лог создастся из ETL-трейсов (если включена телеметрия)
+
+------------------------------------------------------
+5. Diagnostics-Performance: загрузка, фризы
+------------------------------------------------------
+
+5.1 Включение журнала:
+
+    wevtutil sl "Microsoft-Windows-Diagnostics-Performance/Operational" /e:true
+
+5.2 В журнале:
+
+    Event ID 100 — продолжительность загрузки
+    Event ID 200–400 — фризы, проблемы со службами
+
+------------------------------------------------------
+6. AppCompat/Execution History/ProcessAudit (ShimCache)
+------------------------------------------------------
+
+6.1 Требует включения:
+
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache" /v EnableLog /t REG_DWORD /d 1 /f
+
+------------------------------------------------------
+7. Windows Error Reporting UI (GUI отчёты)
+------------------------------------------------------
+
+7.1 Панель управления → Безопасность → Центр поддержки → Просмотр сообщений о проблемах
+
+------------------------------------------------------
+Список файлов, которые нужно собрать для анализа
+------------------------------------------------------
+
+✔ C:\ProgramData\Microsoft\Windows\WER\ReportQueue\*.wer
+✔ C:\ProgramData\Microsoft\Windows\WER\ReportArchive\*.wer
+✔ C:\Users\<user>\AppData\Local\CrashDumps\*.dmp
+✔ C:\Windows\Logs\CBS\CBS.log
+✔ C:\Windows\Logs\DISM\dism.log
+✔ C:\WU_merged.log
+✔ C:\PerfLogs\Admin\BootPerf\*.etl
+✔ C:\ProgramData\Microsoft\Diagnosis\ETLLogs\*
+✔ C:\ProgramData\Microsoft\Windows\ReliabilityMonitor\*.xml
+✔ Export из журнала "Diagnostics-Performance"
+✔ Export из журнала "Application" (последние 48 ч)
+
+------------------------------------------------------
+После сбора:
+------------------------------------------------------
+
+Передать архив или отдельные файлы для анализа — я смогу автоматически извлечь:
+
+- EXE, модули, коды исключений
+- цепочки зависаний
+- проблемы в инициализации служб
+- тайминги загрузки
+- системные повреждения (CBS)
+- историю запусков и падений
+
+Это даст основу для создания автоматического модуля диагностики SmartPOS-агента.

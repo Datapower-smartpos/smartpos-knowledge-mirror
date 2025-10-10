@@ -1,0 +1,1 @@
+powershell -Command "Invoke-RestMethod http://127.0.0.1:7077/action/run -Method POST -Body (@{ ticket_id='TEST-CANCEL'; problem_code='PR0018'; device=@{ type='receipt_printer' } } | ConvertTo-Json) -ContentType 'application/json'"

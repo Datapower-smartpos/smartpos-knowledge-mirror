@@ -1,0 +1,6 @@
+{
+  "daemon_url": "http://127.0.0.1:7077",
+  "printer_name": "SAM4S ELLIX40",
+  "is_admin": false,
+  "auto_purge": "soft"
+}

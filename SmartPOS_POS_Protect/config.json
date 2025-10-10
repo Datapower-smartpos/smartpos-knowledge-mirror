@@ -1,0 +1,12 @@
+{
+"api_key": "CHANGE_ME",
+"listen": "127.0.0.1",
+"port": 11888,
+"data_root": "C:/POS",
+"quota_mb": 1024,
+"retention_days": 14,
+"wer_dump_minfree_mb": 2048,
+"export_masks_default": ["wer","etl","logs","db","eventlog"],
+"targets": ["pos_app.exe","pos_printer.exe"],
+"sku": "BASE"
+}

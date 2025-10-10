@@ -1,0 +1,9 @@
+import json, pathlib
+from analyzer.rules import build_plans
+
+CFG = json.loads((pathlib.Path(__file__).resolve().parents[1] / "config" / "pos_protect_policies.json").read_text(encoding="utf-8"))
+
+def test_spooler_plan_exists():
+    issue = {"issue_code":"PRINT_SPOOLER_STUCK","severity":"WARN","evidence":{}}
+    plans = build_plans([issue], CFG)
+    assert plans and any(s.get("do")=="restart_service" for s in plans[0]["plan"])

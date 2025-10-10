@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "C:\AI\SmartPOS\Protect\pos_collector_healer_core.py", line 343, in <module>
+    main()
+  File "C:\AI\SmartPOS\Protect\pos_collector_healer_core.py", line 339, in main
+    run_server()
+  File "C:\AI\SmartPOS\Protect\pos_collector_healer_core.py", line 329, in run_server
+    with socketserver.TCPServer((CFG["listen"], CFG["port"]), Handler) as httpd:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\az123\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 456, in __init__
+    self.server_bind()
+  File "C:\Users\az123\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 472, in server_bind
+    self.socket.bind(self.server_address)
+OSError: [WinError 10048] Обычно разрешается только одно использование адреса сокета (протокол/сетевой адрес/порт)

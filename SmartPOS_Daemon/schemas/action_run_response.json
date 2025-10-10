@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionRunResponse",
+  "type": "object",
+  "required": [
+    "ticket_id",
+    "problem_code",
+    "actions_done",
+    "evidence",
+    "result_code",
+    "human"
+  ],
+  "properties": {
+    "ticket_id": {
+      "type": "string"
+    },
+    "problem_code": {
+      "type": "string"
+    },
+    "actions_done": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "integer"
+        },
+        "stopped_in": {
+          "type": "number"
+        },
+        "running_in": {
+          "type": "number"
+        },
+        "job_id": {
+          "type": "integer"
+        },
+        "chars": {
+          "type": "integer"
+        },
+        "width": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "result_code": {
+      "type": "string",
+      "enum": [
+        "FIXED",
+        "NOT_FOUND",
+        "ERROR",
+        "ACCESS_DENIED"
+      ]
+    },
+    "human": {
+      "type": "object",
+      "required": [
+        "cashier",
+        "tech"
+      ],
+      "properties": {
+        "cashier": {
+          "type": "string"
+        },
+        "tech": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,155 @@
+<#
+SmartPOS_USB_Tray.ps1 — минимальный Tray/UX для кассира (MVP)
+Author: Разработчик суперпрограмм
+
+Функции:
+- Иконка в трее (через Windows.Forms NotifyIcon), контекстное меню: Статус, Восстановить (recycle), Проверить (preflight), Сообщить инженеру (лог‑пакет WIP), Выход.
+- Пулинг локального HTTP API службы: http://127.0.0.1:8765/api/status
+- Простые уведомления (баллоны) по смене статуса устройств.
+
+Запуск:
+  powershell -ExecutionPolicy Bypass -File .\SmartPOS_USB_Tray.ps1
+Требуется запущенный smartpos_usb_service.py (в консоли или как служба).
+#>
+[CmdletBinding()] param()
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$ErrorActionPreference = 'SilentlyContinue'
+$http = 'http://127.0.0.1:8765'
+# Поддержка API‑ключа для POST (если включён в config.json → auth.shared_secret)
+$global:ApiKey = $env:SMARTPOS_USB_APIKEY
+if($null -eq $global:ApiKey){ $global:ApiKey = '' }
+if([string]::IsNullOrWhiteSpace($global:ApiKey)){
+  $global:ApiKey = Read-Host 'Введите API Key (или оставьте пустым, если отключена аутентификация)'
+}
+$iconGreen = [System.Drawing.SystemIcons]::Information
+$iconYellow = [System.Drawing.SystemIcons]::Warning
+$iconRed = [System.Drawing.SystemIcons]::Error
+
+$notify = New-Object System.Windows.Forms.NotifyIcon
+$notify.Icon = $iconGreen
+$notify.Visible = $true
+$notify.Text = 'SmartPOS USB'
+
+$context = New-Object System.Windows.Forms.ContextMenuStrip
+$miStatus = $context.Items.Add('Статус')
+$miPreflight = $context.Items.Add('Проверить (Preflight)')
+$miRecover = $context.Items.Add('Восстановить выбранное...')
+$miExport  = $context.Items.Add('Сохранить отчёт (ZIP)')
+$context.Items.Add('-') | Out-Null
+$miExit = $context.Items.Add('Выход')
+$notify.ContextMenuStrip = $context
+
+# Храним прошлый снимок для сравнения
+$global:lastSnap = $null
+$global:lastIcon = 'green'
+
+function Get-Status {
+  try {
+    $resp = Invoke-WebRequest -Uri "$http/api/status" -UseBasicParsing -TimeoutSec 2
+    return ($resp.Content | ConvertFrom-Json)
+  } catch { return $null }
+}
+
+function Show-Balloon($title,$text,$level){
+  switch($level){
+    'red' { $notify.Icon = $iconRed }
+    'yellow' { $notify.Icon = $iconYellow }
+    default { $notify.Icon = $iconGreen }
+  }
+  $notify.BalloonTipTitle = $title
+  $notify.BalloonTipText = $text
+  $notify.BalloonTipIcon = 'Info'
+  $notify.ShowBalloonTip(3000)
+}
+
+function Evaluate-Overall($snap){
+  if(-not $snap){ return 'red' }
+  $states = @()
+  foreach($k in $snap.status.Keys){ $states += $snap.status[$k].state }
+  if($states -contains 'FAILED'){ return 'red' }
+  if($states -contains 'DEGRADED' -or $states -contains 'RECOVERING'){ return 'yellow' }
+  return 'green'
+}
+
+# Действия меню
+$miStatus.add_Click({
+  $s = Get-Status
+  if(-not $s){ Show-Balloon 'SmartPOS USB' 'Служба недоступна' 'red'; return }
+  $txt = ''
+  foreach($k in $s.status.Keys){
+    $d = $s.status[$k]
+    $rec = $d.record
+    $txt += "{0} — {1} (COM={2})`n" -f $rec.friendly, $d.state, ($rec.com_port)
+  }
+  Show-Balloon 'Статус устройств' $txt (Evaluate-Overall $s)
+})
+
+$miPreflight.add_Click({
+  try {
+    $resp = Invoke-WebRequest -Uri "$http/api/preflight" -Method POST -UseBasicParsing -TimeoutSec 5 -Headers @{ 'X-API-Key' = $global:ApiKey }
+    $s = $resp.Content | ConvertFrom-Json
+    $lvl = (Evaluate-Overall $s)
+    Show-Balloon 'Preflight' ('Готовность: ' + $lvl) $lvl
+  } catch {
+    Show-Balloon 'Preflight' 'Ошибка запроса' 'red'
+  }
+})
+
+$miRecover.add_Click({
+  # Простая форма выбора устройства для recycle
+  $s = Get-Status
+  if(-not $s){ Show-Balloon 'Восстановить' 'Служба недоступна' 'red'; return }
+  $form = New-Object System.Windows.Forms.Form
+  $form.Text = 'Восстановить устройство'
+  $form.Size = New-Object System.Drawing.Size(420,220)
+  $form.StartPosition = 'CenterScreen'
+  $cb = New-Object System.Windows.Forms.ComboBox
+  $cb.Location = New-Object System.Drawing.Point(12,12)
+  $cb.Size = New-Object System.Drawing.Size(380,30)
+  foreach($k in $s.status.Keys){
+    $rec = $s.status[$k].record
+    [void]$cb.Items.Add("$($rec.friendly)   [$k]")
+  }
+  $btn = New-Object System.Windows.Forms.Button
+  $btn.Text = 'Восстановить (recycle)'
+  $btn.Location = New-Object System.Drawing.Point(12,60)
+  $btn.Add_Click({
+    if(-not $cb.SelectedItem){ return }
+    $id = ($cb.SelectedItem.ToString().Split('[')[-1]).TrimEnd(']')
+    try{ Invoke-WebRequest -Uri "$http/api/action/device/$id/recycle" -Method POST -UseBasicParsing -TimeoutSec 10 -Headers @{ 'X-API-Key' = $global:ApiKey } | Out-Null; Show-Balloon 'Восстановление' 'Команда отправлена' 'yellow' }catch{ Show-Balloon 'Восстановление' 'Ошибка запроса' 'red' }
+    $form.Close()
+  })
+  $form.Controls.Add($cb)
+  $form.Controls.Add($btn)
+  $form.Topmost = $true
+  [void]$form.ShowDialog()
+})
+
+$miExport.add_Click({
+  try {
+    $path = Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\\smartpos_usb_export.zip'
+    Invoke-WebRequest -Uri "$http/api/export?mask=db,logs" -Method POST -UseBasicParsing -TimeoutSec 20 -Headers @{ 'X-API-Key' = $global:ApiKey } -OutFile $path
+    Show-Balloon 'Экспорт' ("Сохранено: $path") 'yellow'
+  } catch {
+    Show-Balloon 'Экспорт' 'Ошибка экспорта' 'red'
+  }
+})
+
+$miExit.add_Click({ $notify.Visible = $false; $notify.Dispose(); [System.Windows.Forms.Application]::Exit() })
+
+# Таймер опроса
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 4000
+$timer.add_Tick({
+  $s = Get-Status
+  $lvl = (Evaluate-Overall $s)
+  if($lvl -ne $global:lastIcon){
+    switch($lvl){ 'red'{$notify.Icon=$iconRed} 'yellow'{$notify.Icon=$iconYellow} default{$notify.Icon=$iconGreen} }
+    $global:lastIcon = $lvl
+  }
+})
+$timer.Start()
+
+[System.Windows.Forms.Application]::Run()

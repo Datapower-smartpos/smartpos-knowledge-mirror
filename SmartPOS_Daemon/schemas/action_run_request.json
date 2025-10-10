@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionRunRequest",
+  "type": "object",
+  "required": [
+    "ticket_id",
+    "problem_code",
+    "device",
+    "context"
+  ],
+  "properties": {
+    "ticket_id": {
+      "type": "string"
+    },
+    "problem_code": {
+      "type": "string",
+      "enum": [
+        "PR0022",
+        "PR0018",
+        "PR0001",
+        "PR0015",
+        "PR0006",
+        "PR0017"
+      ]
+    },
+    "device": {
+      "type": "object",
+      "required": [
+        "type",
+        "conn"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "receipt_printer"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conn": {
+          "type": "string",
+          "enum": [
+            "USB",
+            "ETH",
+            "COM"
+          ]
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "beautify": {
+          "type": "boolean"
+        },
+        "purge": {
+          "enum": [
+            "soft",
+            "hard",
+            "auto",
+            null
+          ]
+        },
+        "raw_user": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
